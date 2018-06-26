@@ -1,0 +1,6 @@
+(executable
+ ((name receiptGenerator)
+  (libraries (core ppx_deriving))
+  (preprocess (pps (ppx_deriving.show)))
+))
+
