@@ -15,16 +15,6 @@ module ReceiptInfo = struct
   }[@@deriving sexp]
 end
 
-let prompt pr fn errMsg =
-  Out_channel.output_string stdout pr;
-  Out_channel.flush stdout;
-  try
-    match In_channel.input_line In_channel.stdin with
-    | None -> failwith errMsg
-    | Some str -> (fn str)
-  with
-  | _ -> failwith errMsg
-
 
 let generateHtmlReceipt ri =
   
@@ -32,13 +22,12 @@ let generateHtmlReceipt ri =
   let style = { Tag.tagType = "style"; Tag.tagData=strStyle; Tag.tagOptions=[]; Tag.internals=[];  } in
   let head = { Tag.tagType = "head"; Tag.tagData=""; Tag.tagOptions=[]; Tag.internals=[style];  } in
 
-
   let rn = Printf.sprintf "%d" ri.ReceiptInfo.receiptNum in
   let td0 = { Tag.tagType = "td"; Tag.tagData="Receipt Num"; Tag.tagOptions=[]; Tag.internals=[];  } in  
   let td00 = { Tag.tagType = "td"; Tag.tagData=rn; Tag.tagOptions=[]; Tag.internals=[];  } in
   let row0 = { Tag.tagType = "tr"; Tag.tagData=""; Tag.tagOptions=[]; Tag.internals=[td0; td00];  } in
 
-  let td111 = { Tag.tagType = "td"; Tag.tagData="Property Addres"; Tag.tagOptions=[]; Tag.internals=[];  } in  
+  let td111 = { Tag.tagType = "td"; Tag.tagData="Property Address"; Tag.tagOptions=[]; Tag.internals=[];  } in  
   let td112 = { Tag.tagType = "td"; Tag.tagData=ri.ReceiptInfo.address; Tag.tagOptions=[]; Tag.internals=[];  } in
   let row10 = { Tag.tagType = "tr"; Tag.tagData=""; Tag.tagOptions=[]; Tag.internals=[td111; td112];  } in
   
@@ -76,29 +65,59 @@ let generateHtmlReceipt ri =
   let html = { Tag.tagType = "html"; Tag.tagData=""; Tag.tagOptions=[]; Tag.internals=[head; body];  } in (toString html)
   
 
-let saveReceipt receipt receiptDate =
+let saveReceipt receipt receiptDate sexpReceipt =
   let fileName = receiptDate ^ ".html" in   
   let file = Out_channel.create fileName in
   Exn.protect ~f:(fun () -> Out_channel.fprintf file "%s" receipt)
+    ~finally:(fun () -> Out_channel.close file);
+  let file = Out_channel.create "receipt.dat" in
+  Exn.protect ~f:(fun () -> Out_channel.fprintf file "%s" sexpReceipt)
      ~finally:(fun () -> Out_channel.close file)
-  
+
+
+let readReceipt =
+  let file = In_channel.create "receipt.dat" in
+  Exn.protect ~f:(fun () ->
+    let strReceipt = In_channel.input_all file in 
+    let receiptInfo = Sexp.of_string strReceipt |> ReceiptInfo.t_of_sexp in receiptInfo)  
+    ~finally:(fun () -> In_channel.close file)
+
+let prompt pr fn errMsg defVal =
+  Out_channel.output_string stdout pr;
+  Out_channel.flush stdout;
+  try
+    match In_channel.input_line In_channel.stdin with
+    | Some str -> (fn str)
+    | None -> (match defVal with
+              | None -> failwith (Printf.sprintf "%s defval " errMsg)
+              | Some x -> x)        
+    
+  with
+  | _ -> (match defVal with
+              | None -> failwith errMsg
+              | Some x -> x) 
+
 let () =
-  let recNum = prompt "Enter receiptNo: " int_of_string "Bad receipt no" in
-  let propAddress = prompt "Enter address: " (fun x -> x) "Bad address" in 
-  let landLord = prompt "Enter the name of the landlord: " (fun x -> x) "Bad landlord name" in
-  let tenant = prompt "Enter the name of the tenant: " (fun s -> s) "Bad tenant name" in
-  let rentAmt = prompt "Enter rent amount: " int_of_string "Bad rent amount" in
+  let open ReceiptInfo in
+  let ri = readReceipt in
+  let open Printf in
+  let recNum = prompt (sprintf "Enter receiptNo: [ %d ] " (ri.receiptNum + 1))  int_of_string "Bad receipt no" (Some (ri.receiptNum + 1)) in
+  let propAddress = prompt (sprintf "Enter address: [ %s ] " ri.address) (fun x -> x) "Bad address"  (Some ri.address) in 
+  let landLord = prompt (sprintf "Enter the name of the landlord: [ %s ] " ri.landLord) (fun x -> x) "Bad landlord name"  (Some ri.landLord) in
+  let tenant = prompt (sprintf "Enter the name of the tenant: [ %s ] " ri.tenant) (fun s -> s) "Bad tenant name" (Some ri.tenant) in
+  let rentAmt = prompt (sprintf "Enter rent amount: [ %d ] " ri.amount) int_of_string "Bad rent amount" (Some ri.amount) in
   let dt = Date.today (Time.Zone.of_string "EST") in
-  let startRent = prompt "Enter start rent date (DD/MM/YYYY): " Date.of_string "Bad start rent date" in
-  let endRent = prompt "Enter end rent date (DD/MM/YYYY): " Date.of_string "Bad end rent date" in
-                
-  let ri = { ReceiptInfo.receiptNum = recNum; ReceiptInfo.landLord = landLord;
-             ReceiptInfo.tenant = tenant; ReceiptInfo.amount = rentAmt; ReceiptInfo.receiptDate = dt;
-             ReceiptInfo.startRent = startRent; ReceiptInfo.endRent = endRent;
-             ReceiptInfo.address = propAddress; } in
+  let startRent = prompt "Enter start rent date (DD/MM/YYYY): " Date.of_string "Bad start rent date" None in
+  let endRent = prompt "Enter end rent date (DD/MM/YYYY): " Date.of_string "Bad end rent date" None in                
+
+  let open ReceiptInfo in
+  let ri = { receiptNum = recNum; landLord = landLord;
+             tenant = tenant; amount = rentAmt; receiptDate = dt;
+             startRent = startRent; endRent = endRent;
+             address = propAddress; } in
   
-  let receipt = generateHtmlReceipt ri in
-    saveReceipt receipt (Date.to_string dt); printf "%s\n" (ReceiptInfo.sexp_of_t ri |> Sexp.to_string)
+  let htmlReceipt = generateHtmlReceipt ri in
+    saveReceipt htmlReceipt (Date.to_string dt) (ReceiptInfo.sexp_of_t ri |> Sexp.to_string)
   
   
         
