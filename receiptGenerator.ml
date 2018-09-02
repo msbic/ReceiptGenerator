@@ -75,51 +75,89 @@ let saveReceipt receipt receiptDate sexpReceipt =
      ~finally:(fun () -> Out_channel.close file)
 
 
-let readReceipt =
-  let file = In_channel.create "receipt.dat" in
-  Exn.protect ~f:(fun () ->
-    let strReceipt = In_channel.input_all file in 
-    let receiptInfo = Sexp.of_string strReceipt |> ReceiptInfo.t_of_sexp in receiptInfo)  
-    ~finally:(fun () -> In_channel.close file)
+(* let readReceipt =
+ *   let file = In_channel.create "receipt.dat" in
+ *   Exn.protect ~f:(fun () ->
+ *     let strReceipt = In_channel.input_all file in 
+ *     let receiptInfo = Sexp.of_string strReceipt |> ReceiptInfo.t_of_sexp in receiptInfo)  
+ *     ~finally:(fun () -> In_channel.close file) *)
 
+let readReceipt =
+  try
+    let file = In_channel.create "receipt.dat" in
+    let strReceipt = In_channel.input_all file in
+    let receiptInfo = Sexp.of_string strReceipt |> ReceiptInfo.t_of_sexp in
+    In_channel.close file; Some receiptInfo   
+  with
+  |_ -> None
+      
 let prompt pr fn errMsg defVal =
   Out_channel.output_string stdout pr;
   Out_channel.flush stdout;
   try
     match In_channel.input_line In_channel.stdin with
-    | Some str -> (fn str)
     | None -> (match defVal with
               | None -> failwith (Printf.sprintf "%s defval " errMsg)
               | Some x -> x)        
+  
+    | Some str ->
+       match str with
+       | "" -> (match defVal with
+              | None -> failwith (Printf.sprintf "%s defval " errMsg)
+              | Some x -> x)            
+       | _ -> (fn str)
     
-  with
-  | _ -> (match defVal with
-              | None -> failwith errMsg
-              | Some x -> x) 
+ with
+ | _ -> (match defVal with
+        | None -> failwith errMsg
+        | Some x -> x) 
 
 let () =
   let open ReceiptInfo in
-  let ri = readReceipt in
+  let ris = readReceipt in
   let open Printf in
-  let recNum = prompt (sprintf "Enter receiptNo: [ %d ] " (ri.receiptNum + 1))  int_of_string "Bad receipt no" (Some (ri.receiptNum + 1)) in
-  let propAddress = prompt (sprintf "Enter address: [ %s ] " ri.address) (fun x -> x) "Bad address"  (Some ri.address) in 
-  let landLord = prompt (sprintf "Enter the name of the landlord: [ %s ] " ri.landLord) (fun x -> x) "Bad landlord name"  (Some ri.landLord) in
-  let tenant = prompt (sprintf "Enter the name of the tenant: [ %s ] " ri.tenant) (fun s -> s) "Bad tenant name" (Some ri.tenant) in
-  let rentAmt = prompt (sprintf "Enter rent amount: [ %d ] " ri.amount) int_of_string "Bad rent amount" (Some ri.amount) in
-  let dt = Date.today (Time.Zone.of_string "EST") in
-  let startRent = prompt "Enter start rent date (DD/MM/YYYY): " Date.of_string "Bad start rent date" None in
-  let endRent = prompt "Enter end rent date (DD/MM/YYYY): " Date.of_string "Bad end rent date" None in                
+  match ris with
+  | Some ri ->
+    
+    let recNum = prompt (sprintf "Enter receiptNo: [ %d ] " (ri.receiptNum + 1))  int_of_string "Bad receipt no" (Some (ri.receiptNum + 1)) in
+    let propAddress = prompt (sprintf "Enter address: [ %s ] " ri.address) (fun x -> x) "Bad address"  (Some ri.address) in
+    (*printf "****** %s ******* \n" propAddress ;*)
+    let landLord = prompt (sprintf "Enter the name of the landlord: [ %s ] " ri.landLord) (fun x -> x) "Bad landlord name"  (Some ri.landLord) in
+    let tenant = prompt (sprintf "Enter the name of the tenant: [ %s ] " ri.tenant) (fun s -> s) "Bad tenant name" (Some ri.tenant) in
+    let rentAmt = prompt (sprintf "Enter rent amount: [ %d ] " ri.amount) int_of_string "Bad rent amount" (Some ri.amount) in
+    let dt = Date.today (Time.Zone.of_string "EST") in
+    let startRent = prompt "Enter start rent date (DD/MM/YYYY): " Date.of_string "Bad start rent date" None in
+    let endRent = prompt "Enter end rent date (DD/MM/YYYY): " Date.of_string "Bad end rent date" None in                
 
-  let open ReceiptInfo in
-  let ri = { receiptNum = recNum; landLord = landLord;
+    let open ReceiptInfo in
+    let nri = { receiptNum = recNum; landLord = landLord;
              tenant = tenant; amount = rentAmt; receiptDate = dt;
              startRent = startRent; endRent = endRent;
              address = propAddress; } in
   
-  let htmlReceipt = generateHtmlReceipt ri in
+    let htmlReceipt = generateHtmlReceipt ri in
+    saveReceipt htmlReceipt (Date.to_string dt) (ReceiptInfo.sexp_of_t nri |> Sexp.to_string)
+    
+  | None ->
+
+    let recNum = prompt (sprintf "Enter receiptNo: [ %d ] " 0)  int_of_string "Bad receipt no" None in
+    let propAddress = prompt (sprintf "Enter address: [ %s ] " "") (fun x -> x) "Bad address"  None in 
+    let landLord = prompt (sprintf "Enter the name of the landlord: [ %s ] " "") (fun x -> x) "Bad landlord name"  None in
+    let tenant = prompt (sprintf "Enter the name of the tenant: [ %s ] " "") (fun s -> s) "Bad tenant name" None in
+    let rentAmt = prompt (sprintf "Enter rent amount: [ %d ] " 0) int_of_string "Bad rent amount" None in
+    let dt = Date.today (Time.Zone.of_string "EST") in
+    let startRent = prompt "Enter start rent date (DD/MM/YYYY): " Date.of_string "Bad start rent date" None in
+    let endRent = prompt "Enter end rent date (DD/MM/YYYY): " Date.of_string "Bad end rent date" None in                
+
+    let open ReceiptInfo in
+    let ri = { receiptNum = recNum; landLord = landLord;
+             tenant = tenant; amount = rentAmt; receiptDate = dt;
+             startRent = startRent; endRent = endRent;
+             address = propAddress; } in
+  
+    let htmlReceipt = generateHtmlReceipt ri in
     saveReceipt htmlReceipt (Date.to_string dt) (ReceiptInfo.sexp_of_t ri |> Sexp.to_string)
-  
-  
+    
         
     
     
