@@ -121,14 +121,15 @@ let () =
     
     let recNum = prompt (sprintf "Enter receiptNo: [ %d ] " (ri.receiptNum + 1))  int_of_string "Bad receipt no" (Some (ri.receiptNum + 1)) in
     let propAddress = prompt (sprintf "Enter address: [ %s ] " ri.address) (fun x -> x) "Bad address"  (Some ri.address) in
-    (*printf "****** %s ******* \n" propAddress ;*)
+    
     let landLord = prompt (sprintf "Enter the name of the landlord: [ %s ] " ri.landLord) (fun x -> x) "Bad landlord name"  (Some ri.landLord) in
     let tenant = prompt (sprintf "Enter the name of the tenant: [ %s ] " ri.tenant) (fun s -> s) "Bad tenant name" (Some ri.tenant) in
     let rentAmt = prompt (sprintf "Enter rent amount: [ %d ] " ri.amount) int_of_string "Bad rent amount" (Some ri.amount) in
     let dt = Date.today (Time.Zone.of_string "EST") in
     let startRent = prompt "Enter start rent date (DD/MM/YYYY): " Date.of_string "Bad start rent date" None in
     let endRent = prompt "Enter end rent date (DD/MM/YYYY): " Date.of_string "Bad end rent date" None in                
-
+    printf "******end rent: %s ******* \n" (Date.to_string endRent) ;
+    
     let open ReceiptInfo in
     let nri = { receiptNum = recNum; landLord = landLord;
              tenant = tenant; amount = rentAmt; receiptDate = dt;
