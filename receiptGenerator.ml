@@ -15,10 +15,14 @@ module ReceiptInfo = struct
   }[@@deriving sexp]
 end
 
-
+let cssStyle = "body {width: 70%;}
+  table, th, td {   border: 1px solid black; padding: 10px; }  
+  table { margin-left: 100px; margin-right: 100px; }
+  h2 { margin-left: 100px;}"
+                   
 let generateHtmlReceipt ri =
   
-  let strStyle = "table, th, td {   border: 1px solid black;  border-collapse: collapse; }" in
+  let strStyle = cssStyle in
   let style = { Tag.tagType = "style"; Tag.tagData=strStyle; Tag.tagOptions=[]; Tag.internals=[];  } in
   let head = { Tag.tagType = "head"; Tag.tagData=""; Tag.tagOptions=[]; Tag.internals=[style];  } in
 
@@ -76,7 +80,8 @@ let saveReceipt receipt receiptDate sexpReceipt =
 
 
 (* let readReceipt =
- *   let file = In_channel.create "receipt.dat" in
+ *   let file 
+= In_channel.create "receipt.dat" in
  *   Exn.protect ~f:(fun () ->
  *     let strReceipt = In_channel.input_all file in 
  *     let receiptInfo = Sexp.of_string strReceipt |> ReceiptInfo.t_of_sexp in receiptInfo)  
@@ -94,7 +99,7 @@ let readReceipt =
 let unrapDefaultVal defVal errMsg convFn =
   match defVal with
   | None -> failwith errMsg
-  | Some v -> (printf "%s" (convFn v)); v
+  | Some v -> v
   
 
 let prompt pr fn errMsg defVal convFunc =
